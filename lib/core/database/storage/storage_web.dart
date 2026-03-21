@@ -1,4 +1,4 @@
-import 'dart:html' as html;
+import 'package:web/web.dart' as web;
 
 import 'storage_stub.dart';
 
@@ -7,17 +7,17 @@ class _LocalStorageAppStorage implements AppStorage {
 
   @override
   Future<String?> read() async {
-    return html.window.localStorage[_key];
+    return web.window.localStorage.getItem(_key);
   }
 
   @override
   Future<void> write(String value) async {
-    html.window.localStorage[_key] = value;
+    web.window.localStorage.setItem(_key, value);
   }
 
   @override
   Future<void> clear() async {
-    html.window.localStorage.remove(_key);
+    web.window.localStorage.removeItem(_key);
   }
 }
 

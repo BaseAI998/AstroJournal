@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'storage/storage_stub.dart' show AppStorage;
 import 'storage/storage.dart';
 
 class Profile {

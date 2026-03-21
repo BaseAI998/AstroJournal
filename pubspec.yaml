@@ -1,5 +1,5 @@
 name: astro_journal
-description: "AstroJournal: 极简深空风格的离线优先日记与情绪回顾工具"
+description: "AstroJournal: 魔法书功能的离线优先日记与情绪回顾工具"
 
 publish_to: 'none'
 
@@ -30,6 +30,7 @@ dependencies:
   # 工具
   intl: ^0.18.1
   uuid: ^4.2.2
+  web: ^0.5.1
 
 dev_dependencies:
   flutter_test:
