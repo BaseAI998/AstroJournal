@@ -39,8 +39,24 @@ dev_dependencies:
   # 代码生成
   build_runner: ^2.4.7
   drift_dev: ^2.14.0
+  flutter_launcher_icons: ^0.13.1
 
   flutter_lints: ^3.0.1
 
 flutter:
   uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: false 
+  # 暂时不上线ios
+  web:
+    generate: true
+    image_path: "assets/icon.png"
+    background_color: "#1E1E1E"
+    theme_color: "#1E1E1E"
+  windows:
+    generate: true
+    image_path: "assets/icon.png"
+    icon_size: 48
+  image_path: "assets/icon.png"
