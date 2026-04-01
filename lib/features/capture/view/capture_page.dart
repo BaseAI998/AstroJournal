@@ -99,7 +99,10 @@ class _CapturePageState extends ConsumerState<CapturePage> {
                   focusNode: _focusNode,
                   maxLines: null,
                   expands: true,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontSize: 18,
+                    height: 1.8,
+                  ),
                   decoration: const InputDecoration(
                     hintText: '此刻有什么想留下的？',
                     border: InputBorder.none,

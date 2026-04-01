@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/onboarding/view/onboarding_page.dart';
 import '../../features/capture/view/capture_page.dart';
-import '../../features/history/view/history_page.dart';
-import '../../features/history/view/history_detail_page.dart';
+import '../../features/history/presentation/history_page.dart';
+import '../../features/history/presentation/history_detail_page.dart';
 import '../../features/chart/view/chart_page.dart';
 import '../../providers/profile_provider.dart';
 
