@@ -1,69 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:intl/intl.dart';
 
 import '../../../providers/journal_provider.dart';
-import 'widgets/history_line_chart.dart';
-import 'widgets/history_detail_popup.dart';
 
-class HistoryPage extends ConsumerStatefulWidget {
+class HistoryPage extends ConsumerWidget {
   const HistoryPage({super.key});
 
   @override
-  ConsumerState<HistoryPage> createState() => _HistoryPageState();
-}
-
-class _HistoryPageState extends ConsumerState<HistoryPage> with SingleTickerProviderStateMixin {
-  int? _selectedIndex;
-  Offset? _tapPosition;
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
-  late ScrollController _scrollController;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController = ScrollController();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  void _onSpotTap(int index, [Offset? position]) {
-    if (_selectedIndex == index) {
-      _animationController.reverse().then((_) {
-        setState(() {
-          _selectedIndex = null;
-          _tapPosition = null;
-        });
-      });
-    } else {
-      setState(() {
-        _selectedIndex = index;
-        if (position != null) {
-          _tapPosition = position;
-        }
-      });
-      _animationController.forward(from: 0.0);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final journalState = ref.watch(journalProvider);
 
     return Scaffold(
@@ -72,7 +19,13 @@ class _HistoryPageState extends ConsumerState<HistoryPage> with SingleTickerProv
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
         title: Text('历史回望', style: Theme.of(context).textTheme.bodyMedium),
       ),
@@ -82,45 +35,99 @@ class _HistoryPageState extends ConsumerState<HistoryPage> with SingleTickerProv
             return const Center(child: Text('暂无历史记录'));
           }
 
-          final chartEntries = entries.reversed.toList();
+          final chartEntries = entries.toList();
 
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final double minWidth = constraints.maxWidth - 32;
-              final double dataWidth = chartEntries.length * 60.0;
-              final double chartWidth = dataWidth > minWidth ? dataWidth : minWidth;
+          final double screenHeight = MediaQuery.of(context).size.height;
 
-              return Stack(
-                children: [
-                  Column(
-                    children: [
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: HistoryLineChart(
-                            chartEntries: chartEntries,
-                            chartWidth: chartWidth,
-                            selectedIndex: _selectedIndex,
-                            scrollController: _scrollController,
-                            onSpotTap: _onSpotTap,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                    ],
-                  ),
-                  if (_selectedIndex != null && _tapPosition != null)
-                    HistoryDetailPopup(
-                      entry: chartEntries[_selectedIndex!],
-                      tapPosition: _tapPosition!,
-                      constraints: constraints,
-                      scrollController: _scrollController,
-                      scaleAnimation: _scaleAnimation,
-                      fadeAnimation: _fadeAnimation,
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: MasonryGridView.count(
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              itemCount: chartEntries.length,
+              itemBuilder: (context, index) {
+                final entry = chartEntries[index];
+                
+                // 基础高度约为屏幕的1/3，通过 index 引入固定的高低差，制造参差感
+                final double cardHeight = (screenHeight / 3) + (index % 4) * 30 - 30;
+
+                return GestureDetector(
+                  onTap: () {
+                    context.push('/history/detail/${entry.id}');
+                  },
+                  child: Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                ],
-              );
-            },
+                    clipBehavior: Clip.antiAlias,
+                    color: Theme.of(context).cardColor,
+                    child: Container(
+                      height: cardHeight,
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  DateFormat('MM-dd HH:mm').format(entry.capturedAt),
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                      ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (entry.fortuneScore != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).primaryColor.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '运势 ${entry.fortuneScore}',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: Theme.of(context).primaryColor,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 11,
+                                        ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: ShaderMask(
+                              shaderCallback: (Rect bounds) {
+                                return const LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [Colors.black, Colors.black, Colors.transparent],
+                                  stops: [0.0, 0.7, 1.0],
+                                ).createShader(bounds);
+                              },
+                              blendMode: BlendMode.dstIn,
+                              child: Text(
+                                entry.bodyText,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      height: 1.5,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),

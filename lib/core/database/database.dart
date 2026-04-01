@@ -19,6 +19,31 @@ class Profile {
   });
 }
 
+class JournalComment {
+  final String text;
+  final DateTime createdAt;
+
+  const JournalComment({
+    required this.text,
+    required this.createdAt,
+  });
+
+  Map<String, Object?> toJson() => {
+        'text': text,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  static JournalComment? fromJson(Map<String, Object?> json) {
+    final text = json['text'];
+    final createdAt = json['createdAt'];
+    if (text is! String || createdAt is! String) return null;
+    return JournalComment(
+      text: text,
+      createdAt: DateTime.parse(createdAt),
+    );
+  }
+}
+
 class JournalEntry {
   final String id;
   final String profileId;
@@ -27,6 +52,7 @@ class JournalEntry {
   final int? fortuneScore;
   final String? astroSnapshot;
   final DateTime createdAt;
+  final List<JournalComment> comments;
 
   const JournalEntry({
     required this.id,
@@ -36,7 +62,30 @@ class JournalEntry {
     this.fortuneScore,
     this.astroSnapshot,
     required this.createdAt,
+    this.comments = const [],
   });
+
+  JournalEntry copyWith({
+    String? id,
+    String? profileId,
+    DateTime? capturedAt,
+    String? bodyText,
+    int? fortuneScore,
+    String? astroSnapshot,
+    DateTime? createdAt,
+    List<JournalComment>? comments,
+  }) {
+    return JournalEntry(
+      id: id ?? this.id,
+      profileId: profileId ?? this.profileId,
+      capturedAt: capturedAt ?? this.capturedAt,
+      bodyText: bodyText ?? this.bodyText,
+      fortuneScore: fortuneScore ?? this.fortuneScore,
+      astroSnapshot: astroSnapshot ?? this.astroSnapshot,
+      createdAt: createdAt ?? this.createdAt,
+      comments: comments ?? this.comments,
+    );
+  }
 }
 
 class AppDatabase {
@@ -169,6 +218,7 @@ Map<String, Object?> _entryToJson(JournalEntry entry) {
     'fortuneScore': entry.fortuneScore,
     'astroSnapshot': entry.astroSnapshot,
     'createdAt': entry.createdAt.toIso8601String(),
+    'comments': entry.comments.map((c) => c.toJson()).toList(),
   };
 }
 
@@ -180,6 +230,7 @@ JournalEntry? _entryFromJson(Map<String, Object?> json) {
   final fortuneScore = json['fortuneScore'];
   final astroSnapshot = json['astroSnapshot'];
   final createdAt = json['createdAt'];
+  final commentsJson = json['comments'];
 
   if (id is! String ||
       profileId is! String ||
@@ -187,6 +238,19 @@ JournalEntry? _entryFromJson(Map<String, Object?> json) {
       bodyText is! String ||
       createdAt is! String) {
     return null;
+  }
+
+  List<JournalComment> comments = [];
+  if (commentsJson is List) {
+    for (final item in commentsJson) {
+      if (item is Map<String, Object?>) {
+        final comment = JournalComment.fromJson(item);
+        if (comment != null) comments.add(comment);
+      } else if (item is Map) {
+        final comment = JournalComment.fromJson(item.cast<String, Object?>());
+        if (comment != null) comments.add(comment);
+      }
+    }
   }
 
   return JournalEntry(
@@ -197,5 +261,6 @@ JournalEntry? _entryFromJson(Map<String, Object?> json) {
     fortuneScore: fortuneScore is int ? fortuneScore : null,
     astroSnapshot: astroSnapshot is String ? astroSnapshot : null,
     createdAt: DateTime.parse(createdAt),
+    comments: comments,
   );
 }

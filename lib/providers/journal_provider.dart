@@ -39,4 +39,30 @@ class JournalNotifier extends StateNotifier<AsyncValue<List<JournalEntry>>> {
       state = AsyncValue.error(e, st);
     }
   }
+
+  Future<void> addComment(String entryId, String text) async {
+    try {
+      final currentState = state;
+      if (currentState is! AsyncData<List<JournalEntry>>) return;
+
+      final entries = currentState.value;
+      final entryIndex = entries.indexWhere((e) => e.id == entryId);
+      if (entryIndex == -1) return;
+
+      final entry = entries[entryIndex];
+      final newComment = JournalComment(
+        text: text,
+        createdAt: DateTime.now(),
+      );
+
+      final updatedEntry = entry.copyWith(
+        comments: [...entry.comments, newComment],
+      );
+
+      await _db.updateEntry(updatedEntry);
+      await _loadEntries();
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
 }
