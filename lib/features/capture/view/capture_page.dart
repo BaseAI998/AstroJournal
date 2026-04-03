@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/database.dart';
 import '../../../providers/journal_provider.dart';
 import '../../../providers/profile_provider.dart';
+import '../../../core/widgets/burn_fade_effect.dart';
 
 class CapturePage extends ConsumerStatefulWidget {
   const CapturePage({super.key});
@@ -19,6 +20,8 @@ class CapturePage extends ConsumerStatefulWidget {
 class _CapturePageState extends ConsumerState<CapturePage> {
   final _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  bool _isTriggered = false;
+  bool _showHintText = true;
 
   @override
   void dispose() {
@@ -46,22 +49,17 @@ class _CapturePageState extends ConsumerState<CapturePage> {
 
     ref.read(journalProvider.notifier).addEntry(entry);
     
-    // Simulate dust clear effect
-    setState(() {
-      _textController.clear();
-    });
-    
-    // Unfocus
+    // Unfocus first to remove cursor before capturing
     _focusNode.unfocus();
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('已保存', style: TextStyle(fontSize: 12)),
-        duration: Duration(seconds: 1),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-    );
+    // Trigger the Stardust effect
+    setState(() {
+      _isTriggered = true;
+      _showHintText = false;
+    });
+    
+    // We remove the SnackBar because it overlays the beautiful stardust effect.
+    // The effect itself serves as the visual feedback for saving.
   }
 
   @override
@@ -94,18 +92,33 @@ class _CapturePageState extends ConsumerState<CapturePage> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: TextField(
-                  controller: _textController,
-                  focusNode: _focusNode,
-                  maxLines: null,
-                  expands: true,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontSize: 18,
-                    height: 1.8,
-                  ),
-                  decoration: const InputDecoration(
-                    hintText: '此刻有什么想留下的？',
-                    border: InputBorder.none,
+                child: BurnFadeEffect(
+                  isTriggered: _isTriggered,
+                  onCaptureComplete: () {
+                    // Clear the text only after snapshot is taken
+                    _textController.clear();
+                  },
+                  onAnimationComplete: () {
+                    if (mounted) {
+                      setState(() {
+                        _isTriggered = false;
+                        _showHintText = true;
+                      });
+                    }
+                  },
+                  child: TextField(
+                    controller: _textController,
+                    focusNode: _focusNode,
+                    maxLines: null,
+                    expands: true,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontSize: 18,
+                      height: 1.8,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: _showHintText ? '此刻有什么想留下的？' : '',
+                      border: InputBorder.none,
+                    ),
                   ),
                 ),
               ),

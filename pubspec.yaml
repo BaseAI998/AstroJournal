@@ -47,6 +47,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  shaders:
+    - shaders/burn.frag
+
 flutter_launcher_icons:
   android: true
   ios: false 

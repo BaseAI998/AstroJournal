@@ -40,6 +40,15 @@ class JournalNotifier extends StateNotifier<AsyncValue<List<JournalEntry>>> {
     }
   }
 
+  Future<void> deleteEntries(Set<String> ids) async {
+    try {
+      await _db.deleteEntries(ids);
+      await _loadEntries();
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
   Future<void> addComment(String entryId, String text) async {
     try {
       final currentState = state;
@@ -58,6 +67,28 @@ class JournalNotifier extends StateNotifier<AsyncValue<List<JournalEntry>>> {
       final updatedEntry = entry.copyWith(
         comments: [...entry.comments, newComment],
       );
+
+      await _db.updateEntry(updatedEntry);
+      await _loadEntries();
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> deleteComment(String entryId, int commentIndex) async {
+    try {
+      final currentState = state;
+      if (currentState is! AsyncData<List<JournalEntry>>) return;
+
+      final entries = currentState.value;
+      final entryIdx = entries.indexWhere((e) => e.id == entryId);
+      if (entryIdx == -1) return;
+
+      final entry = entries[entryIdx];
+      if (commentIndex < 0 || commentIndex >= entry.comments.length) return;
+
+      final updatedComments = [...entry.comments]..removeAt(commentIndex);
+      final updatedEntry = entry.copyWith(comments: updatedComments);
 
       await _db.updateEntry(updatedEntry);
       await _loadEntries();

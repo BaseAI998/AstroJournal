@@ -7,6 +7,7 @@ import '../../features/capture/view/capture_page.dart';
 import '../../features/history/presentation/history_page.dart';
 import '../../features/history/presentation/history_detail_page.dart';
 import '../../features/chart/view/chart_page.dart';
+import '../../features/vine/presentation/vine_origin_page.dart';
 import '../../providers/profile_provider.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -63,6 +64,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/vine',
+                builder: (context, state) => const VineOriginPage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/chart',
                 builder: (context, state) => const ChartPage(),
               ),
@@ -107,6 +116,16 @@ class MainLayout extends StatelessWidget {
                 )
               ]),
               label: 'Capture',
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.hub_outlined),
+              activeIcon: Icon(Icons.hub_outlined, shadows: [
+                Shadow(
+                  color: Theme.of(context).primaryColor,
+                  blurRadius: 12,
+                )
+              ]),
+              label: 'Vine',
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.auto_awesome),
