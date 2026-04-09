@@ -8,6 +8,7 @@ import '../../features/history/presentation/history_page.dart';
 import '../../features/history/presentation/history_detail_page.dart';
 import '../../features/chart/view/chart_page.dart';
 import '../../features/vine/presentation/vine_origin_page.dart';
+import '../../features/chart/view/profile_page.dart';
 import '../../providers/profile_provider.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -47,6 +48,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           final id = state.pathParameters['id']!;
           return HistoryDetailPage(entryId: id);
         },
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfilePage(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/database/database.dart';
 import '../../../providers/journal_provider.dart';
+import '../../../providers/profile_provider.dart';
+import 'widgets/comments_section.dart';
+import 'widgets/ai_chat_section.dart';
 
 class HistoryDetailPage extends ConsumerStatefulWidget {
   final String entryId;
@@ -15,25 +18,109 @@ class HistoryDetailPage extends ConsumerStatefulWidget {
   ConsumerState<HistoryDetailPage> createState() => _HistoryDetailPageState();
 }
 
-class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage> {
+class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _commentController = TextEditingController();
+  final TextEditingController _aiChatController = TextEditingController();
   bool _isEditing = false;
   late TextEditingController _editController;
+  late TabController _tabController;
+  bool _aiInitialized = false;
+  bool _aiLoading = false;
+  final ScrollController _aiScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _editController = TextEditingController();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
   }
 
   @override
   void dispose() {
     _commentController.dispose();
+    _aiChatController.dispose();
     _editController.dispose();
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
+    _aiScrollController.dispose();
     super.dispose();
   }
 
-  /// 判断是否还能编辑：当前时间不能超过日记创建日期当天（即同一天内可编辑）
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging && _tabController.index == 1) {
+      _tryInitAIConversation();
+    }
+  }
+
+  void _tryInitAIConversation() {
+    if (_aiInitialized || _aiLoading) return;
+
+    final journalState = ref.read(journalProvider);
+    final entry = journalState.whenOrNull(
+      data: (entries) =>
+          entries.where((e) => e.id == widget.entryId).firstOrNull,
+    );
+    if (entry == null) return;
+
+    if (entry.aiConversation.isNotEmpty) {
+      _aiInitialized = true;
+      return;
+    }
+
+    _sendAIMessage(null);
+  }
+
+  Future<void> _sendAIMessage(String? userMessage) async {
+    final profileState = ref.read(profileProvider);
+    final profile = profileState.whenOrNull(data: (p) => p);
+    if (profile == null) return;
+
+    setState(() => _aiLoading = true);
+
+    try {
+      await ref.read(journalProvider.notifier).sendAIMessage(
+            widget.entryId,
+            profile,
+            userMessage: userMessage,
+          );
+      _aiInitialized = true;
+      _scrollToBottom();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _aiLoading = false);
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_aiScrollController.hasClients) {
+        _aiScrollController.animateTo(
+          _aiScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  void _submitAIChat() {
+    final text = _aiChatController.text.trim();
+    if (text.isEmpty || _aiLoading) return;
+    _aiChatController.clear();
+    FocusScope.of(context).unfocus();
+    _sendAIMessage(text);
+  }
+
   bool _canEdit(JournalEntry entry) {
     final now = DateTime.now();
     final created = entry.capturedAt;
@@ -84,8 +171,8 @@ class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage> {
         backgroundColor: AppTheme.background,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('删除评论', style: Theme.of(ctx).textTheme.displayMedium),
-        content: Text('确定要删除这条评论吗？',
-            style: Theme.of(ctx).textTheme.bodyMedium),
+        content:
+            Text('确定要删除这条评论吗？', style: Theme.of(ctx).textTheme.bodyMedium),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -94,8 +181,7 @@ class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child:
-                const Text('确认', style: TextStyle(color: AppTheme.danger)),
+            child: const Text('确认', style: TextStyle(color: AppTheme.danger)),
           ),
         ],
       ),
@@ -136,8 +222,8 @@ class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage> {
 
                   if (_isEditing) {
                     return IconButton(
-                      icon: const Icon(Icons.check,
-                          color: AppTheme.accentGold),
+                      icon:
+                          const Icon(Icons.check, color: AppTheme.accentGold),
                       onPressed: () => _saveEdit(entry),
                     );
                   } else {
@@ -167,13 +253,14 @@ class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage> {
 
           return Column(
             children: [
+              // Diary content (scrollable)
               Expanded(
+                flex: 2,
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 日期 + 运势
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -196,8 +283,6 @@ class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage> {
                         ],
                       ),
                       const SizedBox(height: 24),
-
-                      // 正文：编辑模式 or 阅读模式
                       if (_isEditing)
                         TextField(
                           controller: _editController,
@@ -220,149 +305,75 @@ class _HistoryDetailPageState extends ConsumerState<HistoryDetailPage> {
                               .bodyLarge
                               ?.copyWith(height: 1.6),
                         ),
-
-                      const SizedBox(height: 40),
-                      const Divider(),
-                      const SizedBox(height: 16),
-
-                      // 评论区
-                      Text(
-                        '评论 (${entry.comments.length})',
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                      ),
-                      const SizedBox(height: 16),
-                      if (entry.comments.isEmpty)
-                        Text(
-                          '暂无评论，快来添加第一条吧！',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(color: Colors.grey),
-                        )
-                      else
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: entry.comments.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 16),
-                          itemBuilder: (context, index) {
-                            final comment = entry.comments[index];
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor:
-                                      Colors.grey.withOpacity(0.2),
-                                  child: const Icon(Icons.person,
-                                      size: 20, color: Colors.grey),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '我',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: Colors.grey.shade600,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        comment.text,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium
-                                            ?.copyWith(height: 1.4),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        DateFormat('MM-dd HH:mm')
-                                            .format(comment.createdAt),
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: Colors.grey.shade500,
-                                              fontSize: 12,
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline,
-                                      size: 16),
-                                  onPressed: () => _deleteComment(index),
-                                  color: Colors.grey.shade400,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
               ),
 
-              // 底部评论输入
+              const Divider(height: 1),
+
+              // TabBar
               Container(
-                padding: EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  top: 12,
-                  bottom: 12 + MediaQuery.of(context).padding.bottom,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      offset: const Offset(0, -2),
-                      blurRadius: 10,
+                color: Theme.of(context).scaffoldBackgroundColor,
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: AppTheme.accentGold,
+                  unselectedLabelColor: AppTheme.textSecondary,
+                  indicatorColor: AppTheme.accentGold,
+                  indicatorWeight: 2,
+                  labelStyle: const TextStyle(
+                    fontFamily: 'serif',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontFamily: 'serif',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  tabs: [
+                    Tab(text: '我的评论 (${entry.comments.length})'),
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('星灵对话'),
+                          if (_aiLoading) ...[
+                            const SizedBox(width: 6),
+                            const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: AppTheme.accentGold,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                child: Row(
+              ),
+
+              // Tab content
+              Expanded(
+                flex: 3,
+                child: TabBarView(
+                  controller: _tabController,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _commentController,
-                        decoration: InputDecoration(
-                          hintText: '写下你的评论...',
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(24),
-                            borderSide: BorderSide.none,
-                          ),
-                          filled: true,
-                          fillColor: Theme.of(context).cardColor,
-                        ),
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _submitComment(),
-                      ),
+                    CommentsSection(
+                      entry: entry,
+                      commentController: _commentController,
+                      onSubmit: _submitComment,
+                      onDelete: _deleteComment,
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.send),
-                      color: Theme.of(context).primaryColor,
-                      onPressed: _submitComment,
+                    AIChatSection(
+                      entry: entry,
+                      chatController: _aiChatController,
+                      scrollController: _aiScrollController,
+                      isLoading: _aiLoading,
+                      onSubmit: _submitAIChat,
                     ),
                   ],
                 ),

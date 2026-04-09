@@ -9,6 +9,8 @@ class Profile {
   final DateTime birthDateTime;
   final String birthPlaceName;
   final DateTime createdAt;
+  final String? openRouterKey;
+  final String? openRouterModel;
 
   const Profile({
     required this.id,
@@ -16,7 +18,29 @@ class Profile {
     required this.birthDateTime,
     required this.birthPlaceName,
     required this.createdAt,
+    this.openRouterKey,
+    this.openRouterModel,
   });
+
+  Profile copyWith({
+    String? id,
+    String? displayName,
+    DateTime? birthDateTime,
+    String? birthPlaceName,
+    DateTime? createdAt,
+    String? openRouterKey,
+    String? openRouterModel,
+  }) {
+    return Profile(
+      id: id ?? this.id,
+      displayName: displayName ?? this.displayName,
+      birthDateTime: birthDateTime ?? this.birthDateTime,
+      birthPlaceName: birthPlaceName ?? this.birthPlaceName,
+      createdAt: createdAt ?? this.createdAt,
+      openRouterKey: openRouterKey ?? this.openRouterKey,
+      openRouterModel: openRouterModel ?? this.openRouterModel,
+    );
+  }
 }
 
 // ── Origin Map models ──
@@ -111,6 +135,38 @@ class OriginMap {
   Set<String> get entryIds => nodes.map((n) => n.entryId).toSet();
 }
 
+// ── AI Conversation model ──
+
+class AIMessage {
+  final String role; // "user" or "assistant"
+  final String text;
+  final DateTime createdAt;
+
+  const AIMessage({
+    required this.role,
+    required this.text,
+    required this.createdAt,
+  });
+
+  Map<String, Object?> toJson() => {
+        'role': role,
+        'text': text,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  static AIMessage? fromJson(Map<String, Object?> json) {
+    final role = json['role'];
+    final text = json['text'];
+    final createdAt = json['createdAt'];
+    if (role is! String || text is! String || createdAt is! String) return null;
+    return AIMessage(
+      role: role,
+      text: text,
+      createdAt: DateTime.parse(createdAt),
+    );
+  }
+}
+
 // ── Journal models ──
 
 class JournalComment {
@@ -147,6 +203,7 @@ class JournalEntry {
   final String? astroSnapshot;
   final DateTime createdAt;
   final List<JournalComment> comments;
+  final List<AIMessage> aiConversation;
 
   const JournalEntry({
     required this.id,
@@ -157,6 +214,7 @@ class JournalEntry {
     this.astroSnapshot,
     required this.createdAt,
     this.comments = const [],
+    this.aiConversation = const [],
   });
 
   JournalEntry copyWith({
@@ -168,6 +226,7 @@ class JournalEntry {
     String? astroSnapshot,
     DateTime? createdAt,
     List<JournalComment>? comments,
+    List<AIMessage>? aiConversation,
   }) {
     return JournalEntry(
       id: id ?? this.id,
@@ -178,6 +237,7 @@ class JournalEntry {
       astroSnapshot: astroSnapshot ?? this.astroSnapshot,
       createdAt: createdAt ?? this.createdAt,
       comments: comments ?? this.comments,
+      aiConversation: aiConversation ?? this.aiConversation,
     );
   }
 }
@@ -321,6 +381,8 @@ Map<String, Object?> _profileToJson(Profile profile) {
     'birthDateTime': profile.birthDateTime.toIso8601String(),
     'birthPlaceName': profile.birthPlaceName,
     'createdAt': profile.createdAt.toIso8601String(),
+    'openRouterKey': profile.openRouterKey,
+    'openRouterModel': profile.openRouterModel,
   };
 }
 
@@ -345,6 +407,8 @@ Profile? _profileFromJson(Map<String, Object?> json) {
     birthDateTime: DateTime.parse(birthDateTime),
     birthPlaceName: birthPlaceName,
     createdAt: DateTime.parse(createdAt),
+    openRouterKey: json['openRouterKey'] is String ? json['openRouterKey'] as String : null,
+    openRouterModel: json['openRouterModel'] is String ? json['openRouterModel'] as String : null,
   );
 }
 
@@ -358,6 +422,7 @@ Map<String, Object?> _entryToJson(JournalEntry entry) {
     'astroSnapshot': entry.astroSnapshot,
     'createdAt': entry.createdAt.toIso8601String(),
     'comments': entry.comments.map((c) => c.toJson()).toList(),
+    'aiConversation': entry.aiConversation.map((m) => m.toJson()).toList(),
   };
 }
 
@@ -392,6 +457,20 @@ JournalEntry? _entryFromJson(Map<String, Object?> json) {
     }
   }
 
+  final aiJson = json['aiConversation'];
+  List<AIMessage> aiConversation = [];
+  if (aiJson is List) {
+    for (final item in aiJson) {
+      if (item is Map<String, Object?>) {
+        final msg = AIMessage.fromJson(item);
+        if (msg != null) aiConversation.add(msg);
+      } else if (item is Map) {
+        final msg = AIMessage.fromJson(item.cast<String, Object?>());
+        if (msg != null) aiConversation.add(msg);
+      }
+    }
+  }
+
   return JournalEntry(
     id: id,
     profileId: profileId,
@@ -401,6 +480,7 @@ JournalEntry? _entryFromJson(Map<String, Object?> json) {
     astroSnapshot: astroSnapshot is String ? astroSnapshot : null,
     createdAt: DateTime.parse(createdAt),
     comments: comments,
+    aiConversation: aiConversation,
   );
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/database/database.dart';
+import '../../../core/widgets/city_autocomplete.dart';
 import '../../../providers/profile_provider.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
@@ -14,19 +15,18 @@ class OnboardingPage extends ConsumerStatefulWidget {
 
 class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   final _nameController = TextEditingController();
-  final _placeController = TextEditingController();
+  String _cityName = '';
   DateTime? _selectedDate;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _placeController.dispose();
     super.dispose();
   }
 
   void _saveProfile() {
     final name = _nameController.text.trim();
-    final place = _placeController.text.trim();
+    final place = _cityName.trim();
 
     if (name.isEmpty || place.isEmpty || _selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -110,10 +110,16 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              TextField(
-                controller: _placeController,
+              CityAutocomplete(
+                initialValue: _cityName,
+                onSelected: (city) {
+                  setState(() {
+                    _cityName = city.displayName;
+                  });
+                },
                 decoration: const InputDecoration(
-                  labelText: '出生城市',
+                  labelText: '出生城市（英文）',
+                  hintText: '输入城市名搜索',
                   border: OutlineInputBorder(),
                 ),
               ),

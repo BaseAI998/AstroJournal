@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/database/database.dart';
+import '../core/services/ai_service.dart';
 import 'database_provider.dart';
 
 final journalProvider = StateNotifierProvider<JournalNotifier, AsyncValue<List<JournalEntry>>>((ref) {
@@ -95,5 +96,51 @@ class JournalNotifier extends StateNotifier<AsyncValue<List<JournalEntry>>> {
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
+  }
+
+  /// Send a message to the AI and get a response.
+  /// If [userMessage] is null, triggers the AI opening message (first visit).
+  Future<String> sendAIMessage(String entryId, Profile profile, {String? userMessage}) async {
+    final currentState = state;
+    if (currentState is! AsyncData<List<JournalEntry>>) {
+      throw Exception('日记数据未加载');
+    }
+
+    final entries = currentState.value;
+    final entryIndex = entries.indexWhere((e) => e.id == entryId);
+    if (entryIndex == -1) throw Exception('日记不存在');
+
+    final entry = entries[entryIndex];
+    final aiService = AIService();
+
+    // Add user message to conversation first (if provided)
+    List<AIMessage> updatedConversation = [...entry.aiConversation];
+    if (userMessage != null) {
+      updatedConversation.add(AIMessage(
+        role: 'user',
+        text: userMessage,
+        createdAt: DateTime.now(),
+      ));
+    }
+
+    // Call AI
+    final reply = await aiService.chat(
+      profile: profile,
+      entry: entry,
+      history: updatedConversation,
+    );
+
+    // Add AI reply
+    updatedConversation.add(AIMessage(
+      role: 'assistant',
+      text: reply,
+      createdAt: DateTime.now(),
+    ));
+
+    final updatedEntry = entry.copyWith(aiConversation: updatedConversation);
+    await _db.updateEntry(updatedEntry);
+    await _loadEntries();
+
+    return reply;
   }
 }
